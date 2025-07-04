@@ -7,55 +7,38 @@ using System.Windows.Forms;
 namespace Northkorea_Run
 {
 
-    /// Hauptformular der Northkorea Run Anwendung
-    /// Enthält Logik für Spielzustände, Level-Initialisierung, Zeichnen und Steuerung
 
     public partial class Form1 : Form
     {
-        // Timer für den Spiel-Loop (Tick alle 50ms)
         private System.Windows.Forms.Timer gameTimer;
-        // Wände des Labyrinths
         private List<Rectangle>? walls = null;
-        // Punkte (Schlüssel) zum Einsammeln
         private List<Point>? points = null;
-        // Geister-Instanzen, die den Spieler jagen
         private List<Ghost>? ghosts = null;
-        // Rechteck des Spielers und Bewegungsparameter
         private Rectangle player;
         private int playerSpeed = 8;
-        private int playerDx, playerDy;       // Aktuelle Richtung
-        private int wantedDx, wantedDy;       // Gewünschte Richtung durch Tastendruck
-        // Zellengröße und Labyrinthdimension
+        private int playerDx, playerDy;       
+        private int wantedDx, wantedDy;       
         private int cellSize = 40;
         private int mazeSize = 15;
         private int currentLevel;
-        // Flags für Spielzustände und Spezialmodi
         private bool inGame, gameOver, gameWon;
-        private bool kimMode;                 // "Kim Mode" als Osterei
-        private bool showPoster;              // Anzeige des Posters
-        private bool cheatActive;             // Cheat aktiv (Super-Speed)
-        private bool posterUsedThisLevel;     // Poster bereits verwendet in Level
-        // Fortschritt der Level (3 Level)
+        private bool kimMode;               
+        private bool showPoster;            
+        private bool cheatActive;             
+        private bool posterUsedThisLevel;    
         private bool[] levelCompleted = new bool[3];
-        // Puffer für Tastatur-Easteregg
         private string eggBuffer = string.Empty;
-        // Zeitpunkte zur Steuerung von Poster/Cheat
         private DateTime playerLastMoved = DateTime.Now;
         private DateTime cheatStart = DateTime.MinValue;
-        // Buttons für Poster-Auswahl
         private Button? btnFührer = null;
         private Button? btnEgal = null;
-        // Bilder für Menüs und Endbildschirme
         private Image? startMenuImage;
         private Image? keyImage;
         private Image? winImage;
         private Image? gameOverImage;
         private Image? endCongratsImage;
-        // Ausgangstür-Rechteck im Labyrinth
         private Rectangle exitDoor;
         private bool doorOpen;
-
-        // Definition der Labyrinthe für drei Level als Liste von Strings
         private readonly List<List<string>> mazes = new List<List<string>>
         {
             new List<string>
@@ -144,7 +127,7 @@ namespace Northkorea_Run
         }
 
 
-        /// Zeigt das Startmenü mit drei Level-Buttons
+        // Zeigt das Startmenü mit drei Level-Buttons
 
         private void InitializeStartScreen()
         {
@@ -191,7 +174,7 @@ namespace Northkorea_Run
         }
 
 
-        /// Zeigt Bildschirm bei Spielende (Verloren) mit Retry-Button
+        // Zeigt Bildschirm bei Spielende (Verloren) mit Retry-Button
 
         private void ShowGameOverScreen()
         {
@@ -219,7 +202,7 @@ namespace Northkorea_Run
 
         private bool allLevelsCompleted = false;
 
-        /// Zeigt Bildschirm bei Levelgewinn und verwaltet Fortschritt
+        // Zeigt Bildschirm bei Levelgewinn und verwaltet Fortschritt
 
         private void ShowWinScreen(int levelIndex)
         {
@@ -258,7 +241,7 @@ namespace Northkorea_Run
         }
 
 
-        /// Startet ein Level: Initialisiert Wände, Punkte und Geister
+        // Startet ein Level: Initialisiert Wände, Punkte und Geister
 
         private void StartLevel(int mazeIndex)
         {
@@ -306,7 +289,7 @@ namespace Northkorea_Run
         }
 
 
-        /// Spiel-Loop, ausgeführt bei jedem Timer-Tick
+        // Spiel-Loop, ausgeführt bei jedem Timer-Tick
 
         private void GameTimer_Tick(object? sender, EventArgs e)
         {
@@ -345,7 +328,7 @@ namespace Northkorea_Run
         }
 
 
-        /// Zeigt Buttons für Poster-Auswahl
+        // Zeigt Buttons für Poster-Auswahl
 
         private void ShowPosterButtons()
         {
@@ -360,7 +343,7 @@ namespace Northkorea_Run
         }
 
 
-        /// Entfernt Poster-Buttons von der Form
+        // Entfernt Poster-Buttons von der Form
 
         private void RemovePosterButtons()
         {
@@ -369,7 +352,7 @@ namespace Northkorea_Run
         }
 
 
-        /// Zeichnet alle Spielobjekte auf die Form
+        // Zeichnet alle Spielobjekte auf die Form
 
         private void DrawGameWindow(object? sender, PaintEventArgs? e)
         {
@@ -447,7 +430,7 @@ namespace Northkorea_Run
         }
 
 
-        /// Zeichnet den Geist als rote Flagge mit Stern
+        // Zeichnet den Geist als rote Flagge mit Stern
 
         private void DrawGhostAsFlag(Graphics g, Rectangle rect)
         {
@@ -457,7 +440,7 @@ namespace Northkorea_Run
         }
 
 
-        /// Zeichnet den Spieler als menschlichen Kopf
+        // Zeichnet den Spieler als menschlichen Kopf
 
         private void DrawPlayerAsHumanHead(Graphics g, Rectangle rect)
         {
@@ -471,7 +454,7 @@ namespace Northkorea_Run
         }
 
 
-        /// Zeichnet den Spieler im "Kim Mode" als goldenen Kopf
+        // Zeichnet den Spieler im "Kim Mode" als goldenen Kopf
 
         private void DrawPlayerAsKimHead(Graphics g, Rectangle rect)
         {
@@ -485,7 +468,7 @@ namespace Northkorea_Run
         }
 
 
-        /// Erzeugt Punkte für den Stern auf der Flagge
+        // Erzeugt Punkte für den Stern auf der Flagge
 
         private PointF[] StarPoints(float cx, float cy, float outerR, float innerR, int numPoints, float startAngleDeg)
         {
@@ -501,13 +484,13 @@ namespace Northkorea_Run
         }
 
 
-        /// Verarbeitet Tasteneingaben: Bewegung, Cheat und Osterei
+        // Verarbeitet Tasteneingaben: Bewegung, Cheat und EasterEgg
 
         private void HandleKeyDown(object? sender, KeyEventArgs e)
         {
             if (!inGame)
             {
-                // Osterei-Modus: "KIM" und "RESET"
+                // EasterEgg-Modus: "KIM" und "RESET"
                 if (e.KeyCode >= Keys.A && e.KeyCode <= Keys.Z)
                 {
                     eggBuffer += e.KeyCode.ToString();
@@ -550,7 +533,7 @@ namespace Northkorea_Run
                 this.speed = speed;
             }
 
-            /// Bewegt den Geist in Richtung Spieler, unter Berücksichtigung von Wänden und Kim Mode
+            // Bewegt den Geist in Richtung Spieler, unter Berücksichtigung von Wänden und Kim Mode
             public void MoveTowards(Rectangle player, List<Rectangle> walls, bool kimMode)
             {
                 int eff = speed * (kimMode ? 2 : 1);
