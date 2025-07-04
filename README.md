@@ -33,11 +33,13 @@ Schlüssel als wichtiges Spielelement
 
 Gegner mit KI, die den Spieler verfolgen
 
-Easter Eggs wie der Kim-Mode
+Easter Eggs wie der Kim-Mode 
 
 Cheat-Modus (Super-Speed und Unverwundbarkeit)
 
 Startmenü und Endbildschirm
+
+Wenn man 10 Sekunden auf der Stelle bleibt kommt ein Propaganda Zettel
 
 Gut kommentierter und übersichtlicher Code
 
@@ -46,6 +48,6 @@ Bewegung: Pfeiltasten
 
 Cheat-Modus: Strg + Alt + L
 
-Kim-Mode aktivieren: "KIM" auf der Tastatur eingeben
+Kim-Mode aktivieren: "KIM" auf der Tastatur eingeben (Kann nur im Startmenue aktiviert werden und nach dem ersten Versuch von Abschnitt 1 bzw. man ist mind. 1 mal im Spiel gewesen.)
 
 Kim-Mode deaktivieren: "RESET" eingeben
