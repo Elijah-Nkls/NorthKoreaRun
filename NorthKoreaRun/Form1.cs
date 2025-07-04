@@ -10,6 +10,7 @@ namespace Northkorea_Run
     {
         private System.Windows.Forms.Timer gameTimer;
         private List<Rectangle> walls;
+        private List<Point> points;
         private int cellSize = 40, mazeSize = 15;
         private Rectangle player;
         private int playerSpeed = 8;
@@ -54,20 +55,38 @@ namespace Northkorea_Run
                     }
                 }
             }
-            // Initialize game timer
-            gameTimer = new System.Windows.Forms.Timer();
-            gameTimer.Interval = 50;
-            gameTimer.Tick += new EventHandler(GameTimer_Tick);
-
-
-            // Initialize player
-            player = new Rectangle(50, 50, 30, 30);
+            // Determine empty cells and spawn point
+            List<Point> emptyCells = new List<Point>();
+            for (int y = 0; y < maze.Count; y++)
+            {
+                for (int x = 0; x < maze[y].Length; x++)
+                {
+                    if (maze[y][x] == '0')
+                    {
+                        emptyCells.Add(new Point(x, y));
+                    }
+                }
+            }
+            Point spawnCell = emptyCells[0];
+            player = new Rectangle(spawnCell.X * cellSize + 5, spawnCell.Y * cellSize + 5, cellSize - 10, cellSize - 10);
             playerDx = 0;
             playerDy = 0;
             wantedDx = 0;
             wantedDy = 0;
+            // Place collectible points
+            Random rnd = new Random();
+            var freeForPoints = emptyCells.Where(p => !(p.X == spawnCell.X && p.Y == spawnCell.Y)).ToList();
+            var chosenPoints = new HashSet<int>();
+            while (chosenPoints.Count < 5 && chosenPoints.Count < freeForPoints.Count)
+            {
+                chosenPoints.Add(rnd.Next(freeForPoints.Count));
+            }
+            points = chosenPoints.Select(i => new Point(freeForPoints[i].X * cellSize, freeForPoints[i].Y * cellSize)).ToList();
 
-            // Start the game timer
+            // Initialize game timer
+            gameTimer = new System.Windows.Forms.Timer();
+            gameTimer.Interval = 50;
+            gameTimer.Tick += new EventHandler(GameTimer_Tick);
             gameTimer.Start();
         }
 
@@ -97,25 +116,25 @@ namespace Northkorea_Run
         private void GameTimer_Tick(object sender, EventArgs e)
         {
             // Move player based on current direction
-            // Calculate wanted movement
             Rectangle wantedPosition = player;
             wantedPosition.X += wantedDx * playerSpeed;
             wantedPosition.Y += wantedDy * playerSpeed;
-            // If desired direction is not blocked, update actual direction
             if (!walls.Any(w => w.IntersectsWith(wantedPosition)))
             {
                 playerDx = wantedDx;
                 playerDy = wantedDy;
             }
-            // Calculate next position for actual movement
             Rectangle nextPosition = player;
             nextPosition.X += playerDx * playerSpeed;
             nextPosition.Y += playerDy * playerSpeed;
-            // Move player if no wall collision in that direction
             if (!walls.Any(w => w.IntersectsWith(nextPosition)))
             {
                 player = nextPosition;
             }
+            // Remove collected points
+            int keySize = 32;
+            int offset = (cellSize - keySize) / 2;
+            points.RemoveAll(p => new Rectangle(p.X + offset, p.Y + offset, keySize, keySize).IntersectsWith(player));
             this.Invalidate();
         }
 
@@ -128,6 +147,15 @@ namespace Northkorea_Run
             foreach (Rectangle wall in walls)
             {
                 g.FillRectangle(Brushes.DarkRed, wall);
+            }
+
+            // Draw collectible points
+            int keySize = 32;
+            int offset = (cellSize - keySize) / 2;
+            foreach (Point pt in points)
+            {
+                g.FillEllipse(Brushes.Gold, new Rectangle(pt.X + offset, pt.Y + offset, keySize, keySize));
+                g.DrawEllipse(new Pen(Color.Gray, 2), new Rectangle(pt.X + offset, pt.Y + offset, keySize, keySize));
             }
 
             // Draw player as a gold circle
