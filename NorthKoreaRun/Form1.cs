@@ -13,6 +13,7 @@ namespace Northkorea_Run
         private List<Point> points;
         private Rectangle exitDoor;
         private bool doorOpen;
+        private List<Ghost> ghosts;
         private int cellSize = 40, mazeSize = 15;
         private Rectangle player;
         private int playerSpeed = 8;
@@ -87,6 +88,16 @@ namespace Northkorea_Run
             exitDoor = new Rectangle(13 * cellSize, 13 * cellSize, cellSize, cellSize);
             doorOpen = false;
 
+            // Initialize ghost(s)
+            ghosts = new List<Ghost>();
+            var forGhosts = emptyCells.Where(p => !(p.X == spawnCell.X && p.Y == spawnCell.Y) && !points.Any(pt => pt.X / cellSize == p.X && pt.Y / cellSize == p.Y)).ToList();
+            int ghostSize = cellSize - 10;
+            if (forGhosts.Count > 0)
+            {
+                Point ghostCell = forGhosts[forGhosts.Count - 1];
+                ghosts.Add(new Ghost(ghostCell.X * cellSize + 5, ghostCell.Y * cellSize + 5, ghostSize, 3));
+            }
+
             // Initialize game timer
             gameTimer = new System.Windows.Forms.Timer();
             gameTimer.Interval = 50;
@@ -119,29 +130,42 @@ namespace Northkorea_Run
 
         private void GameTimer_Tick(object sender, EventArgs e)
         {
-            if (!walls.Any(w => w.IntersectsWith(new Rectangle(player.X + wantedDx * playerSpeed, player.Y + wantedDy * playerSpeed, player.Width, player.Height))))
+            // Calculate wanted movement
+            Rectangle wantedPosition = player;
+            wantedPosition.X += wantedDx * playerSpeed;
+            wantedPosition.Y += wantedDy * playerSpeed;
+            if (!walls.Any(w => w.IntersectsWith(wantedPosition)))
             {
                 playerDx = wantedDx;
                 playerDy = wantedDy;
             }
-            if (!walls.Any(w => w.IntersectsWith(new Rectangle(player.X + playerDx * playerSpeed, player.Y + playerDy * playerSpeed, player.Width, player.Height))))
+            // Calculate next position for actual movement
+            Rectangle nextPosition = player;
+            nextPosition.X += playerDx * playerSpeed;
+            nextPosition.Y += playerDy * playerSpeed;
+            if (!walls.Any(w => w.IntersectsWith(nextPosition)))
             {
-                player = new Rectangle(player.X + playerDx * playerSpeed, player.Y + playerDy * playerSpeed, player.Width, player.Height);
+                player = nextPosition;
             }
             // Remove collected points
             int keySize = 32;
             int offset = (cellSize - keySize) / 2;
             points.RemoveAll(p => new Rectangle(p.X + offset, p.Y + offset, keySize, keySize).IntersectsWith(player));
-            // Open exit door if all points collected
             if (!doorOpen && points.Count == 0)
             {
                 doorOpen = true;
             }
-            // Check if player reached the exit
             if (doorOpen && exitDoor.IntersectsWith(player))
             {
                 gameTimer.Stop();
                 MessageBox.Show("Level completed!");
+            }
+            if (ghosts != null)
+            {
+                foreach (var ghost in ghosts)
+                {
+                    ghost.MoveTowards(player, walls);
+                }
             }
             this.Invalidate();
         }
@@ -149,25 +173,75 @@ namespace Northkorea_Run
         private void DrawGameWindow(object sender, PaintEventArgs e)
         {
             Graphics g = e.Graphics;
-            if (doorOpen)
-            {
-                g.FillRectangle(Brushes.SaddleBrown, exitDoor);
-                g.DrawRectangle(new Pen(Color.Yellow, 4), exitDoor);
-            }
-            // Draw player as a gold circle
-            g.FillEllipse(Brushes.Gold, player);
+            // Clear background
+            g.Clear(Color.Black);
             // Draw maze walls
             foreach (Rectangle wall in walls)
             {
                 g.FillRectangle(Brushes.DarkRed, wall);
             }
+
             // Draw collectible points
             int keySize = 32;
             int offset = (cellSize - keySize) / 2;
-            foreach (Point point in points)
+            foreach (var point in points)
             {
                 g.FillEllipse(Brushes.Gold, new Rectangle(point.X + offset, point.Y + offset, keySize, keySize));
-                g.DrawEllipse(new Pen(Color.Yellow, 2), new Rectangle(point.X + offset, point.Y + offset, keySize, keySize));
+                g.DrawEllipse(new Pen(Color.Gray, 2), new Rectangle(point.X + offset, point.Y + offset, keySize, keySize));
+            }
+
+            // Draw exit door if open
+            if (doorOpen)
+            {
+                g.FillRectangle(Brushes.SaddleBrown, exitDoor);
+                g.DrawRectangle(new Pen(Color.Yellow, 4), exitDoor);
+                int knobR = 6;
+                g.FillEllipse(Brushes.Gold, exitDoor.X + exitDoor.Width - 14, exitDoor.Y + exitDoor.Height / 2 - knobR / 2, knobR, knobR);
+            }
+
+            // Draw player as a gold circle
+            g.FillEllipse(Brushes.Gold, player);
+            // Draw ghost(s)
+            if (ghosts != null)
+            {
+                foreach (var ghost in ghosts)
+                {
+                    g.FillEllipse(Brushes.Red, ghost.Rect);
+                }
+            }
+        }
+
+        class Ghost
+        {
+            public Rectangle Rect;
+            private int speed;
+            public Ghost(int x, int y, int size, int speed = 2)
+            {
+                Rect = new Rectangle(x, y, size, size);
+                this.speed = speed;
+            }
+            public void MoveTowards(Rectangle player, List<Rectangle> walls)
+            {
+                int effectiveSpeed = speed;
+                List<Point> directions = new List<Point> { new Point(-1, 0), new Point(1, 0), new Point(0, -1), new Point(0, 1) };
+                double bestDist = double.MaxValue;
+                Point bestDir = new Point(0, 0);
+                foreach (Point dir in directions)
+                {
+                    Rectangle next = Rect;
+                    next.X += dir.X * effectiveSpeed;
+                    next.Y += dir.Y * effectiveSpeed;
+                    if (!walls.Any(w => w.IntersectsWith(next)))
+                    {
+                        double dist = Math.Sqrt(Math.Pow(player.X - next.X, 2) + Math.Pow(player.Y - next.Y, 2));
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            bestDir = dir;
+                        }
+                    }
+                }
+                Rect = new Rectangle(Rect.X + bestDir.X * effectiveSpeed, Rect.Y + bestDir.Y * effectiveSpeed, Rect.Width, Rect.Height);
             }
         }
     }
