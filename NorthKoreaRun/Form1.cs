@@ -8,7 +8,7 @@ namespace Northkorea_Run
 {
     public partial class Form1 : Form
     {
-        private System.Windows.Forms.Timer gameTimer;
+        private Timer gameTimer;
         private List<Rectangle> walls;
         private List<Point> points;
         private List<Ghost> ghosts;
@@ -21,6 +21,7 @@ namespace Northkorea_Run
         private DateTime cheatStart = DateTime.MinValue, playerLastMoved = DateTime.Now;
         private Button btnFührer, btnEgal;
         private Image startMenuImage;
+        private Image gameOverImage;  // ? neu in Commit 13
 
         private List<List<string>> mazes = new List<List<string>>
         {
@@ -84,14 +85,17 @@ namespace Northkorea_Run
         {
             InitializeComponent();
 
-            // Lade Startmenü-Bild
+            // Lade Startmenu-Bild
             startMenuImage = Image.FromFile("Bilder/startmenu.png");
+            // ? neu in Commit 13: Game-Over-Bild laden
+            gameOverImage = Image.FromFile("Bilder/gameover.png");
+
             InitializeStartScreen();
         }
 
         private void InitializeComponent()
         {
-            this.gameTimer = new System.Windows.Forms.Timer { Interval = 50 };
+            gameTimer = new Timer { Interval = 50 };
             gameTimer.Tick += GameTimer_Tick;
 
             this.Size = new Size(cellSize * mazeSize, cellSize * mazeSize);
@@ -103,7 +107,6 @@ namespace Northkorea_Run
 
         private void InitializeStartScreen()
         {
-            // Reset aller Spielzustände
             RemovePosterButtons();
             showPoster = posterUsedThisLevel = cheatActive = kimMode = inGame = false;
             Controls.Clear();
@@ -149,7 +152,6 @@ namespace Northkorea_Run
 
         private void StartLevel(int mazeIndex)
         {
-            // Setup Spielzustand
             RemovePosterButtons();
             posterUsedThisLevel = false;
             inGame = true;
@@ -163,25 +165,18 @@ namespace Northkorea_Run
             var maze = mazes[mazeIndex];
             var empty = new List<Point>();
 
-            // Erstelle Wände und Liste leerer Zellen
             for (int y = 0; y < maze.Count; y++)
-            {
                 for (int x = 0; x < maze[y].Length; x++)
-                {
                     if (maze[y][x] == '1')
                         walls.Add(new Rectangle(x * cellSize, y * cellSize, cellSize, cellSize));
                     else
                         empty.Add(new Point(x, y));
-                }
-            }
 
-            // Spieler-Spawn
             var spawn = empty[0];
             player = new Rectangle(spawn.X * cellSize + 5, spawn.Y * cellSize + 5, cellSize - 10, cellSize - 10);
             playerDx = playerDy = wantedDx = wantedDy = 0;
             playerLastMoved = DateTime.Now;
 
-            // Verteile 5 Punkte
             var rnd = new Random();
             var freeCells = empty.Skip(1).ToList();
             var chosen = new HashSet<int>();
@@ -190,11 +185,9 @@ namespace Northkorea_Run
             foreach (var i in chosen)
                 points.Add(new Point(freeCells[i].X * cellSize, freeCells[i].Y * cellSize));
 
-            // Setze Ausgang
             exitDoor = new Rectangle(13 * cellSize, 13 * cellSize, cellSize, cellSize);
             doorOpen = false;
 
-            // Spawn bis zu 3 Geister
             int gSize = cellSize - 10;
             foreach (var c in freeCells.Take(3))
                 ghosts.Add(new Ghost(c.X * cellSize + 5, c.Y * cellSize + 5, gSize, 3));
@@ -204,7 +197,6 @@ namespace Northkorea_Run
 
         private void HandleKeyDown(object sender, KeyEventArgs e)
         {
-            // Steuerung
             switch (e.KeyCode)
             {
                 case Keys.Left: wantedDx = -1; wantedDy = 0; break;
@@ -218,7 +210,6 @@ namespace Northkorea_Run
         {
             if (!inGame) return;
 
-            // Bewegungswunsch übernehmen
             var wish = new Rectangle(
                 player.X + wantedDx * playerSpeed,
                 player.Y + wantedDy * playerSpeed,
@@ -227,7 +218,6 @@ namespace Northkorea_Run
             if (!walls.Any(w => w.IntersectsWith(wish)))
                 (playerDx, playerDy) = (wantedDx, wantedDy);
 
-            // Spieler bewegen
             var next = new Rectangle(
                 player.X + playerDx * playerSpeed,
                 player.Y + playerDy * playerSpeed,
@@ -236,26 +226,23 @@ namespace Northkorea_Run
             if (!walls.Any(w => w.IntersectsWith(next)))
                 player = next;
 
-            // Punkte einsammeln
             int keySize = 32, off = (cellSize - keySize) / 2;
             points.RemoveAll(p => new Rectangle(p.X + off, p.Y + off, keySize, keySize).IntersectsWith(player));
 
-            // Tür öffnen
             if (!doorOpen && points.Count == 0)
                 doorOpen = true;
 
-            // Geister bewegen und Kollision prüfen
+            // Geister bewegen
             foreach (var gh in ghosts)
                 gh.MoveTowards(player, walls);
+
+            // Kollision: statt MessageBox nun Game-Over-Screen
             if (ghosts.Any(gh => gh.Rect.IntersectsWith(player)))
             {
-                gameTimer.Stop();
-                MessageBox.Show("Game Over!");
-                InitializeStartScreen();
+                ShowGameOverScreen();
                 return;
             }
 
-            // Level geschafft?
             if (doorOpen && exitDoor.IntersectsWith(player))
             {
                 gameTimer.Stop();
@@ -267,6 +254,32 @@ namespace Northkorea_Run
             Invalidate();
         }
 
+        // Neue Methode aus Commit 13
+        private void ShowGameOverScreen()
+        {
+            RemovePosterButtons();
+            gameTimer.Stop();
+            Controls.Clear();
+
+            var retry = new Button
+            {
+                Text = "",
+                Size = new Size(370, 90),
+                Location = new Point((ClientSize.Width - 370) / 2, (ClientSize.Height - 90) / 2),
+                BackColor = Color.Transparent,
+                FlatStyle = FlatStyle.Flat,
+                TabStop = false,
+                ForeColor = Color.Transparent
+            };
+            retry.FlatAppearance.BorderSize = 0;
+            retry.FlatAppearance.MouseOverBackColor = Color.Transparent;
+            retry.FlatAppearance.MouseDownBackColor = Color.Transparent;
+            retry.Click += (s, e) => InitializeStartScreen();
+
+            Controls.Add(retry);
+            Invalidate();
+        }
+
         private void DrawGameWindow(object sender, PaintEventArgs e)
         {
             var g = e.Graphics;
@@ -274,39 +287,30 @@ namespace Northkorea_Run
 
             if (!inGame)
             {
-                // Startmenü zeichnen
-                g.DrawImage(startMenuImage, 0, 0, ClientSize.Width, ClientSize.Height);
+                // Startmenü oder Game-Over: wenn Controls leer sind, ShowGameOverScreen war aktiv
+                if (Controls.Count == 1 && gameOverImage != null)
+                    g.DrawImage(gameOverImage, 0, 0, ClientSize.Width, ClientSize.Height);
+                else if (startMenuImage != null)
+                    g.DrawImage(startMenuImage, 0, 0, ClientSize.Width, ClientSize.Height);
                 return;
             }
 
-            // Wände
+            // während des Spiels
             foreach (var w in walls)
                 g.FillRectangle(Brushes.DarkRed, w);
 
-            // Punkte
             int keySz = 32, offSz = (cellSize - keySz) / 2;
             foreach (var p in points)
-            {
-                g.FillEllipse(Brushes.Gold, new Rectangle(p.X + offSz, p.Y + offSz, keySz, keySz));
-                g.DrawEllipse(Pens.Gray, new Rectangle(p.X + offSz, p.Y + offSz, keySz, keySz));
-            }
+                g.DrawImage(null, new Rectangle(p.X + offSz, p.Y + offSz, keySz, keySz));
 
-            // Ausgang
             if (doorOpen)
             {
                 g.FillRectangle(Brushes.SaddleBrown, exitDoor);
                 g.DrawRectangle(Pens.Yellow, exitDoor);
-                int knob = 6;
-                g.FillEllipse(Brushes.Gold,
-                    exitDoor.X + exitDoor.Width - 14,
-                    exitDoor.Y + exitDoor.Height / 2 - knob / 2,
-                    knob, knob);
             }
 
-            // Spieler
             g.FillEllipse(Brushes.Gold, player);
 
-            // Geister als Flaggen
             foreach (var gh in ghosts)
                 DrawGhostAsFlag(g, gh.Rect);
         }
@@ -327,12 +331,12 @@ namespace Northkorea_Run
         private PointF[] StarPoints(float cx, float cy, float outerR, float innerR, int numPoints, float startAngleDeg)
         {
             var pts = new List<PointF>();
-            double angle = startAngleDeg * Math.PI / 180.0, step = Math.PI / numPoints;
+            double ang = startAngleDeg * Math.PI / 180.0, step = Math.PI / numPoints;
             for (int i = 0; i < numPoints * 2; i++)
             {
                 double r = (i % 2 == 0) ? outerR : innerR;
-                pts.Add(new PointF(cx + (float)(Math.Cos(angle) * r), cy + (float)(Math.Sin(angle) * r)));
-                angle += step;
+                pts.Add(new PointF(cx + (float)(Math.Cos(ang) * r), cy + (float)(Math.Sin(ang) * r)));
+                ang += step;
             }
             return pts.ToArray();
         }
@@ -350,7 +354,8 @@ namespace Northkorea_Run
             {
                 int eff = speed;
                 var dirs = new[] { new Point(-1, 0), new Point(1, 0), new Point(0, -1), new Point(0, 1) };
-                double best = double.MaxValue; Point bestDir = new Point();
+                double best = double.MaxValue;
+                Point bestDir = new Point();
                 foreach (var d in dirs)
                 {
                     var nxt = Rect; nxt.X += d.X * eff; nxt.Y += d.Y * eff;
