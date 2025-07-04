@@ -8,7 +8,7 @@ namespace Northkorea_Run
 {
     public partial class Form1 : Form
     {
-        private Timer gameTimer;
+        private System.Windows.Forms.Timer gameTimer;
         private List<Rectangle> walls;
         private List<Point> points;
         private Rectangle exitDoor;
@@ -22,13 +22,19 @@ namespace Northkorea_Run
         private int currentLevel;
         private bool[] levelCompleted = new bool[3];
 
-        // Commit 9: Cheat-Code-Felder
+        // Commit 9: Cheat-Code
         private bool cheatActive;
         private DateTime cheatStart;
 
         // Commit 10: Kim-Mode Easter Egg
         private bool kimMode;
         private string eggBuffer = "";
+
+        // Commit 11: Poster-Mechanik
+        private bool showPoster;
+        private bool posterUsedThisLevel;
+        private Button btnFührer, btnEgal;
+        private DateTime playerLastMoved;
 
         private List<List<string>> mazes = new List<List<string>>
         {
@@ -92,26 +98,29 @@ namespace Northkorea_Run
         {
             InitializeComponent();
 
-            // Commit 9: Cheat initialisieren
+            // Cheat initialisieren
             cheatActive = false;
             cheatStart = DateTime.MinValue;
 
-            // Commit 10: Kim-Mode initialisieren
+            // Kim-Mode initialisieren
             kimMode = false;
             eggBuffer = "";
+
+            // Poster-Mechanik initialisieren
+            showPoster = posterUsedThisLevel = false;
 
             StartGame();
         }
 
         private void InitializeComponent()
         {
-            this.gameTimer = new Timer { Interval = 50 };
-            this.gameTimer.Tick += GameTimer_Tick;
-            this.Size = new Size(cellSize * mazeSize, cellSize * mazeSize);
-            this.DoubleBuffered = true;
-            this.Paint += DrawGameWindow;
-            this.KeyDown += HandleKeyDown;
-            this.PreviewKeyDown += (s, e) => e.IsInputKey = true;
+            gameTimer = new System.Windows.Forms.Timer { Interval = 50 };
+            gameTimer.Tick += GameTimer_Tick;
+            Size = new Size(cellSize * mazeSize, cellSize * mazeSize);
+            DoubleBuffered = true;
+            Paint += DrawGameWindow;
+            KeyDown += HandleKeyDown;
+            PreviewKeyDown += (s, e) => e.IsInputKey = true;
         }
 
         private void StartGame()
@@ -120,11 +129,10 @@ namespace Northkorea_Run
             points = new List<Point>();
             ghosts = new List<Ghost>();
             Controls.Clear();
+            showPoster = posterUsedThisLevel = false;
 
             var maze = mazes[currentLevel];
             var emptyCells = new List<Point>();
-
-            // Wände und leere Zellen ermitteln
             for (int y = 0; y < maze.Count; y++)
                 for (int x = 0; x < maze[y].Length; x++)
                     if (maze[y][x] == '1')
@@ -132,17 +140,13 @@ namespace Northkorea_Run
                     else
                         emptyCells.Add(new Point(x, y));
 
-            // Spieler an erster leerer Zelle platzieren
+            // Spieler spawnen
             var spawn = emptyCells[0];
-            player = new Rectangle(
-                spawn.X * cellSize + 5,
-                spawn.Y * cellSize + 5,
-                cellSize - 10,
-                cellSize - 10
-            );
+            player = new Rectangle(spawn.X * cellSize + 5, spawn.Y * cellSize + 5, cellSize - 10, cellSize - 10);
             playerDx = playerDy = wantedDx = wantedDy = 0;
+            playerLastMoved = DateTime.Now;
 
-            // Sammelobjekte (5 Stück) zufällig verteilen
+            // Punkte verteilen
             var rnd = new Random();
             var free = emptyCells.Where(p => !p.Equals(spawn)).ToList();
             var chosen = new HashSet<int>();
@@ -151,11 +155,11 @@ namespace Northkorea_Run
             foreach (var i in chosen)
                 points.Add(new Point(free[i].X * cellSize, free[i].Y * cellSize));
 
-            // Ausgangstür setzen
+            // Ausgangstür
             exitDoor = new Rectangle(13 * cellSize, 13 * cellSize, cellSize, cellSize);
             doorOpen = false;
 
-            // Geister spawnen (bis zu 3)
+            // Geister spawnen
             int ghostSize = cellSize - 10;
             for (int i = 0; i < Math.Min(3, free.Count); i++)
             {
@@ -168,7 +172,7 @@ namespace Northkorea_Run
 
         private void HandleKeyDown(object sender, KeyEventArgs e)
         {
-            // Commit 10: Easter Egg buffer für Kim-Mode
+            // Kim-Mode Easter Egg
             if (!kimMode && !gameTimer.Enabled)
             {
                 if (e.KeyCode >= Keys.A && e.KeyCode <= Keys.Z)
@@ -189,7 +193,7 @@ namespace Northkorea_Run
                 }
             }
 
-            // Commit 9: Cheat aktivieren mit Strg+Alt+L
+            // Cheat aktivieren mit Strg+Alt+L
             if (e.Control && e.Alt && e.KeyCode == Keys.L && !cheatActive)
             {
                 cheatActive = true;
@@ -199,28 +203,37 @@ namespace Northkorea_Run
             }
 
             // Bewegungstasten
-            if (gameTimer.Enabled)
+            switch (e.KeyCode)
             {
-                switch (e.KeyCode)
-                {
-                    case Keys.Left: wantedDx = -1; wantedDy = 0; break;
-                    case Keys.Right: wantedDx = 1; wantedDy = 0; break;
-                    case Keys.Up: wantedDx = 0; wantedDy = -1; break;
-                    case Keys.Down: wantedDx = 0; wantedDy = 1; break;
-                }
+                case Keys.Left: wantedDx = -1; wantedDy = 0; break;
+                case Keys.Right: wantedDx = 1; wantedDy = 0; break;
+                case Keys.Up: wantedDx = 0; wantedDy = -1; break;
+                case Keys.Down: wantedDx = 0; wantedDy = 1; break;
             }
         }
 
         private void GameTimer_Tick(object sender, EventArgs e)
         {
-            // Commit 9: Cheat deaktivieren nach 10 Sekunden
+            // Poster-Mechanik: Idle prüfen
+            if (!showPoster && !posterUsedThisLevel &&
+                (DateTime.Now - playerLastMoved).TotalSeconds > 10)
+            {
+                showPoster = true;
+                ShowPosterButtons();
+                posterUsedThisLevel = true;
+                Invalidate();
+                return;
+            }
+            if (showPoster) return;
+
+            // Cheat deaktivieren nach 10s
             if (cheatActive && (DateTime.Now - cheatStart).TotalSeconds > 10)
             {
                 cheatActive = false;
                 playerSpeed = 8;
             }
 
-            // Richtung wechseln, wenn frei
+            // Richtung übernehmen, wenn frei
             var wantPos = new Rectangle(
                 player.X + wantedDx * playerSpeed,
                 player.Y + wantedDy * playerSpeed,
@@ -236,19 +249,23 @@ namespace Northkorea_Run
                 player.Width, player.Height
             );
             if (!walls.Any(w => w.IntersectsWith(nextPos)))
+            {
                 player = nextPos;
+                playerLastMoved = DateTime.Now;
+            }
 
             // Punkte einsammeln
             int keySize = 32, offset = (cellSize - keySize) / 2;
-            points.RemoveAll(p => new Rectangle(
-                p.X + offset, p.Y + offset, keySize, keySize
-            ).IntersectsWith(player));
+            points.RemoveAll(p =>
+                new Rectangle(p.X + offset, p.Y + offset, keySize, keySize)
+                .IntersectsWith(player)
+            );
 
             // Ausgang öffnen
             if (!doorOpen && points.Count == 0)
                 doorOpen = true;
 
-            // Geister bewegen & Kollision prüfen
+            // Geister bewegen & Kollision
             foreach (var gh in ghosts)
                 gh.MoveTowards(player, walls);
             foreach (var gh in ghosts)
@@ -271,52 +288,112 @@ namespace Northkorea_Run
             Invalidate();
         }
 
+        private void ShowPosterButtons()
+        {
+            if (btnFührer != null || btnEgal != null) return;
+            int w = 220, h = 45;
+            btnFührer = new Button
+            {
+                Text = "Dem Führer stellen",
+                Width = w,
+                Height = h,
+                Font = new Font("Arial", 14, FontStyle.Bold),
+                BackColor = Color.DarkRed,
+                ForeColor = Color.White,
+                Left = (ClientSize.Width - w) / 2,
+                Top = ClientSize.Height / 2 + 30
+            };
+            btnEgal = new Button
+            {
+                Text = "Ist mir egal!",
+                Width = w,
+                Height = h,
+                Font = new Font("Arial", 14, FontStyle.Bold),
+                BackColor = Color.DarkGreen,
+                ForeColor = Color.White,
+                Left = btnFührer.Left,
+                Top = btnFührer.Top + h + 16
+            };
+            btnFührer.Click += (s, e) =>
+            {
+                RemovePosterButtons();
+                showPoster = false;
+                MessageBox.Show("Dem Führer stellen — Spiel vorbei!");
+            };
+            btnEgal.Click += (s, e) =>
+            {
+                RemovePosterButtons();
+                showPoster = false;
+                Invalidate();
+            };
+            Controls.Add(btnFührer);
+            Controls.Add(btnEgal);
+            btnFührer.BringToFront();
+            btnEgal.BringToFront();
+        }
+
+        private void RemovePosterButtons()
+        {
+            if (btnFührer != null)
+            {
+                Controls.Remove(btnFührer);
+                btnFührer.Dispose();
+                btnFührer = null;
+            }
+            if (btnEgal != null)
+            {
+                Controls.Remove(btnEgal);
+                btnEgal.Dispose();
+                btnEgal = null;
+            }
+        }
+
         private void DrawGameWindow(object sender, PaintEventArgs e)
         {
             var g = e.Graphics;
             g.Clear(Color.Black);
 
-            // Wände zeichnen
+            // Wände
             foreach (var w in walls)
                 g.FillRectangle(Brushes.DarkRed, w);
 
-            // Punkte zeichnen
-            int keySize = 32, offset = (cellSize - keySize) / 2;
+            // Punkte
+            int keySize2 = 32, off2 = (cellSize - keySize2) / 2;
             foreach (var p in points)
             {
-                g.FillEllipse(Brushes.Gold, new Rectangle(p.X + offset, p.Y + offset, keySize, keySize));
-                g.DrawEllipse(Pens.Gray, new Rectangle(p.X + offset, p.Y + offset, keySize, keySize));
+                g.FillEllipse(Brushes.Gold, new Rectangle(p.X + off2, p.Y + off2, keySize2, keySize2));
+                g.DrawEllipse(Pens.Gray, new Rectangle(p.X + off2, p.Y + off2, keySize2, keySize2));
             }
 
-            // Ausgang zeichnen
+            // Ausgang
             if (doorOpen)
             {
                 g.FillRectangle(Brushes.SaddleBrown, exitDoor);
                 g.DrawRectangle(Pens.Yellow, exitDoor);
-                int knobR = 6;
+                int knob = 6;
                 g.FillEllipse(Brushes.Gold,
                     exitDoor.X + exitDoor.Width - 14,
-                    exitDoor.Y + exitDoor.Height / 2 - knobR / 2,
-                    knobR, knobR);
+                    exitDoor.Y + exitDoor.Height / 2 - knob / 2,
+                    knob, knob);
             }
 
-            // Spieler zeichnen (je nach Kim-Mode)
+            // Spieler (Kim-Mode oder normal)
             if (kimMode)
                 DrawPlayerAsKimHead(g, player);
             else
                 DrawPlayerAsHumanHead(g, player);
 
-            // Geister als Flaggen zeichnen
+            // Geister
             foreach (var gh in ghosts)
                 DrawGhostAsFlag(g, gh.Rect);
 
-            // Commit 9: Cheat-Status einblenden
+            // Cheat-Status
             if (cheatActive)
             {
-                string cheatMsg = "SUPER-SPEED + UNVERWUNDBAR!";
+                string msg = "SUPER-SPEED + UNVERWUNDBAR!";
                 Font f = new Font("Arial", 18, FontStyle.Bold);
-                SizeF sz = g.MeasureString(cheatMsg, f);
-                g.DrawString(cheatMsg, f, Brushes.Yellow, (ClientSize.Width - sz.Width) / 2, 8);
+                SizeF sz = g.MeasureString(msg, f);
+                g.DrawString(msg, f, Brushes.Yellow, (ClientSize.Width - sz.Width) / 2, 8);
                 f.Dispose();
             }
         }
@@ -325,17 +402,10 @@ namespace Northkorea_Run
         {
             Brush skin = new SolidBrush(Color.Peru);
             g.FillEllipse(skin, rect);
-
-            Rectangle hair = new Rectangle(rect.X, rect.Y, rect.Width, rect.Height / 2);
-            g.FillEllipse(Brushes.SaddleBrown, hair);
-
-            int cx = rect.X + rect.Width / 2;
-            int cy = rect.Y + rect.Height / 2;
-            int eyeR = Math.Max(2, rect.Width / 10);
-
+            g.FillEllipse(Brushes.SaddleBrown, new Rectangle(rect.X, rect.Y, rect.Width, rect.Height / 2));
+            int cx = rect.X + rect.Width / 2, cy = rect.Y + rect.Height / 2, eyeR = Math.Max(2, rect.Width / 10);
             g.FillEllipse(Brushes.Black, cx - eyeR - 3, cy - 3, eyeR, eyeR);
             g.FillEllipse(Brushes.Black, cx + 3, cy - 3, eyeR, eyeR);
-
             g.DrawArc(new Pen(Color.Black, 2), cx - 8, cy + 4, 16, 8, 20, 140);
             skin.Dispose();
         }
@@ -343,9 +413,7 @@ namespace Northkorea_Run
         private void DrawPlayerAsKimHead(Graphics g, Rectangle rect)
         {
             g.FillEllipse(Brushes.Gold, rect);
-            Rectangle hair = new Rectangle(rect.X, rect.Y, rect.Width, rect.Height / 2);
-            g.FillEllipse(Brushes.Black, hair);
-
+            g.FillEllipse(Brushes.Black, new Rectangle(rect.X, rect.Y, rect.Width, rect.Height / 2));
             int cx = rect.X + rect.Width / 2, cy = rect.Y + rect.Height / 2, r = rect.Width / 5;
             g.FillEllipse(Brushes.Black, cx - r - 8, cy - 3, r * 2, r);
             g.FillEllipse(Brushes.Black, cx + 8 - r, cy - 3, r * 2, r);
@@ -366,23 +434,15 @@ namespace Northkorea_Run
             g.FillPolygon(Brushes.Gold, star);
         }
 
-        private PointF[] StarPoints(
-            float cx, float cy,
-            float outerR, float innerR,
-            int numPoints, float startAngleDeg
-        )
+        private PointF[] StarPoints(float cx, float cy, float outerR, float innerR, int numPoints, float startAngleDeg)
         {
             var pts = new List<PointF>();
-            double angle = startAngleDeg * Math.PI / 180.0;
-            double step = Math.PI / numPoints;
+            double ang = startAngleDeg * Math.PI / 180.0, step = Math.PI / numPoints;
             for (int i = 0; i < numPoints * 2; i++)
             {
                 double r = (i % 2 == 0) ? outerR : innerR;
-                pts.Add(new PointF(
-                    cx + (float)(Math.Cos(angle) * r),
-                    cy + (float)(Math.Sin(angle) * r)
-                ));
-                angle += step;
+                pts.Add(new PointF(cx + (float)(Math.Cos(ang) * r), cy + (float)(Math.Sin(ang) * r)));
+                ang += step;
             }
             return pts.ToArray();
         }
@@ -400,30 +460,19 @@ namespace Northkorea_Run
             {
                 int eff = speed;
                 var dirs = new[] { new Point(-1, 0), new Point(1, 0), new Point(0, -1), new Point(0, 1) };
-                double bestDist = double.MaxValue;
+                double best = double.MaxValue;
                 Point bestDir = new Point();
                 foreach (var d in dirs)
                 {
                     var next = Rect;
-                    next.X += d.X * eff;
-                    next.Y += d.Y * eff;
+                    next.X += d.X * eff; next.Y += d.Y * eff;
                     if (!walls.Any(w => w.IntersectsWith(next)))
                     {
-                        double dist = Math.Sqrt(
-                            Math.Pow(player.X - next.X, 2) + Math.Pow(player.Y - next.Y, 2)
-                        );
-                        if (dist < bestDist)
-                        {
-                            bestDist = dist;
-                            bestDir = d;
-                        }
+                        double dist = Math.Sqrt(Math.Pow(player.X - next.X, 2) + Math.Pow(player.Y - next.Y, 2));
+                        if (dist < best) { best = dist; bestDir = d; }
                     }
                 }
-                Rect = new Rectangle(
-                    Rect.X + bestDir.X * eff,
-                    Rect.Y + bestDir.Y * eff,
-                    Rect.Width, Rect.Height
-                );
+                Rect = new Rectangle(Rect.X + bestDir.X * eff, Rect.Y + bestDir.Y * eff, Rect.Width, Rect.Height);
             }
         }
     }
