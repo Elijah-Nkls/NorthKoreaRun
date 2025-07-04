@@ -14,6 +14,7 @@ namespace Northkorea_Run
         private Rectangle player;
         private int playerSpeed = 8;
         private int playerDx, playerDy;
+        private int wantedDx, wantedDy;
 
         public Form1()
         {
@@ -58,10 +59,13 @@ namespace Northkorea_Run
             gameTimer.Interval = 50;
             gameTimer.Tick += new EventHandler(GameTimer_Tick);
 
+
             // Initialize player
             player = new Rectangle(50, 50, 30, 30);
             playerDx = 0;
             playerDy = 0;
+            wantedDx = 0;
+            wantedDy = 0;
 
             // Start the game timer
             gameTimer.Start();
@@ -72,20 +76,20 @@ namespace Northkorea_Run
             switch (e.KeyCode)
             {
                 case Keys.Left:
-                    playerDx = -1;
-                    playerDy = 0;
+                    wantedDx = -1;
+                    wantedDy = 0;
                     break;
                 case Keys.Right:
-                    playerDx = 1;
-                    playerDy = 0;
+                    wantedDx = 1;
+                    wantedDy = 0;
                     break;
                 case Keys.Up:
-                    playerDx = 0;
-                    playerDy = -1;
+                    wantedDx = 0;
+                    wantedDy = -1;
                     break;
                 case Keys.Down:
-                    playerDx = 0;
-                    playerDy = 1;
+                    wantedDx = 0;
+                    wantedDy = 1;
                     break;
             }
         }
@@ -93,11 +97,21 @@ namespace Northkorea_Run
         private void GameTimer_Tick(object sender, EventArgs e)
         {
             // Move player based on current direction
-            // Calculate next position
+            // Calculate wanted movement
+            Rectangle wantedPosition = player;
+            wantedPosition.X += wantedDx * playerSpeed;
+            wantedPosition.Y += wantedDy * playerSpeed;
+            // If desired direction is not blocked, update actual direction
+            if (!walls.Any(w => w.IntersectsWith(wantedPosition)))
+            {
+                playerDx = wantedDx;
+                playerDy = wantedDy;
+            }
+            // Calculate next position for actual movement
             Rectangle nextPosition = player;
             nextPosition.X += playerDx * playerSpeed;
             nextPosition.Y += playerDy * playerSpeed;
-            // Move if no wall collision
+            // Move player if no wall collision in that direction
             if (!walls.Any(w => w.IntersectsWith(nextPosition)))
             {
                 player = nextPosition;
