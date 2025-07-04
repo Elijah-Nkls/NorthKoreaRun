@@ -22,9 +22,13 @@ namespace Northkorea_Run
         private int currentLevel;
         private bool[] levelCompleted = new bool[3];
 
-        // ? Commit 9: Cheat-Code-Felder
+        // Commit 9: Cheat-Code-Felder
         private bool cheatActive;
         private DateTime cheatStart;
+
+        // Commit 10: Kim-Mode Easter Egg
+        private bool kimMode;
+        private string eggBuffer = "";
 
         private List<List<string>> mazes = new List<List<string>>
         {
@@ -88,9 +92,13 @@ namespace Northkorea_Run
         {
             InitializeComponent();
 
-            // ? Commit 9: Cheat-Code initialisieren
+            // Commit 9: Cheat initialisieren
             cheatActive = false;
             cheatStart = DateTime.MinValue;
+
+            // Commit 10: Kim-Mode initialisieren
+            kimMode = false;
+            eggBuffer = "";
 
             StartGame();
         }
@@ -124,12 +132,14 @@ namespace Northkorea_Run
                     else
                         emptyCells.Add(new Point(x, y));
 
-            // Spieler an erster leeren Zelle platzieren
+            // Spieler an erster leerer Zelle platzieren
             var spawn = emptyCells[0];
-            player = new Rectangle(spawn.X * cellSize + 5,
-                                   spawn.Y * cellSize + 5,
-                                   cellSize - 10,
-                                   cellSize - 10);
+            player = new Rectangle(
+                spawn.X * cellSize + 5,
+                spawn.Y * cellSize + 5,
+                cellSize - 10,
+                cellSize - 10
+            );
             playerDx = playerDy = wantedDx = wantedDy = 0;
 
             // Sammelobjekte (5 Stück) zufällig verteilen
@@ -158,15 +168,28 @@ namespace Northkorea_Run
 
         private void HandleKeyDown(object sender, KeyEventArgs e)
         {
-            switch (e.KeyCode)
+            // Commit 10: Easter Egg buffer für Kim-Mode
+            if (!kimMode && !gameTimer.Enabled)
             {
-                case Keys.Left: wantedDx = -1; wantedDy = 0; break;
-                case Keys.Right: wantedDx = 1; wantedDy = 0; break;
-                case Keys.Up: wantedDx = 0; wantedDy = -1; break;
-                case Keys.Down: wantedDx = 0; wantedDy = 1; break;
+                if (e.KeyCode >= Keys.A && e.KeyCode <= Keys.Z)
+                {
+                    eggBuffer += (char)e.KeyCode;
+                    if (eggBuffer.Length > 6)
+                        eggBuffer = eggBuffer.Substring(eggBuffer.Length - 6);
+                    if (eggBuffer.ToUpper().EndsWith("KIM"))
+                    {
+                        kimMode = true;
+                        Invalidate();
+                    }
+                    if (eggBuffer.ToUpper().EndsWith("RESET"))
+                    {
+                        kimMode = false;
+                        Invalidate();
+                    }
+                }
             }
 
-            // ? Commit 9: Cheat aktivieren mit Strg+Alt+L
+            // Commit 9: Cheat aktivieren mit Strg+Alt+L
             if (e.Control && e.Alt && e.KeyCode == Keys.L && !cheatActive)
             {
                 cheatActive = true;
@@ -174,11 +197,23 @@ namespace Northkorea_Run
                 playerSpeed = 11;
                 Invalidate();
             }
+
+            // Bewegungstasten
+            if (gameTimer.Enabled)
+            {
+                switch (e.KeyCode)
+                {
+                    case Keys.Left: wantedDx = -1; wantedDy = 0; break;
+                    case Keys.Right: wantedDx = 1; wantedDy = 0; break;
+                    case Keys.Up: wantedDx = 0; wantedDy = -1; break;
+                    case Keys.Down: wantedDx = 0; wantedDy = 1; break;
+                }
+            }
         }
 
         private void GameTimer_Tick(object sender, EventArgs e)
         {
-            // ? Commit 9: Cheat deaktivieren nach 10 Sekunden
+            // Commit 9: Cheat deaktivieren nach 10 Sekunden
             if (cheatActive && (DateTime.Now - cheatStart).TotalSeconds > 10)
             {
                 cheatActive = false;
@@ -213,7 +248,7 @@ namespace Northkorea_Run
             if (!doorOpen && points.Count == 0)
                 doorOpen = true;
 
-            // Geister bewegen & Kollision
+            // Geister bewegen & Kollision prüfen
             foreach (var gh in ghosts)
                 gh.MoveTowards(player, walls);
             foreach (var gh in ghosts)
@@ -241,11 +276,11 @@ namespace Northkorea_Run
             var g = e.Graphics;
             g.Clear(Color.Black);
 
-            // Wände
+            // Wände zeichnen
             foreach (var w in walls)
                 g.FillRectangle(Brushes.DarkRed, w);
 
-            // Punkte
+            // Punkte zeichnen
             int keySize = 32, offset = (cellSize - keySize) / 2;
             foreach (var p in points)
             {
@@ -253,7 +288,7 @@ namespace Northkorea_Run
                 g.DrawEllipse(Pens.Gray, new Rectangle(p.X + offset, p.Y + offset, keySize, keySize));
             }
 
-            // Ausgang
+            // Ausgang zeichnen
             if (doorOpen)
             {
                 g.FillRectangle(Brushes.SaddleBrown, exitDoor);
@@ -265,14 +300,17 @@ namespace Northkorea_Run
                     knobR, knobR);
             }
 
-            // Spieler
-            g.FillEllipse(Brushes.Gold, player);
+            // Spieler zeichnen (je nach Kim-Mode)
+            if (kimMode)
+                DrawPlayerAsKimHead(g, player);
+            else
+                DrawPlayerAsHumanHead(g, player);
 
-            // Geister als Flaggen
+            // Geister als Flaggen zeichnen
             foreach (var gh in ghosts)
                 DrawGhostAsFlag(g, gh.Rect);
 
-            // ? Commit 9: Cheat-Status einblenden
+            // Commit 9: Cheat-Status einblenden
             if (cheatActive)
             {
                 string cheatMsg = "SUPER-SPEED + UNVERWUNDBAR!";
@@ -281,6 +319,38 @@ namespace Northkorea_Run
                 g.DrawString(cheatMsg, f, Brushes.Yellow, (ClientSize.Width - sz.Width) / 2, 8);
                 f.Dispose();
             }
+        }
+
+        private void DrawPlayerAsHumanHead(Graphics g, Rectangle rect)
+        {
+            Brush skin = new SolidBrush(Color.Peru);
+            g.FillEllipse(skin, rect);
+
+            Rectangle hair = new Rectangle(rect.X, rect.Y, rect.Width, rect.Height / 2);
+            g.FillEllipse(Brushes.SaddleBrown, hair);
+
+            int cx = rect.X + rect.Width / 2;
+            int cy = rect.Y + rect.Height / 2;
+            int eyeR = Math.Max(2, rect.Width / 10);
+
+            g.FillEllipse(Brushes.Black, cx - eyeR - 3, cy - 3, eyeR, eyeR);
+            g.FillEllipse(Brushes.Black, cx + 3, cy - 3, eyeR, eyeR);
+
+            g.DrawArc(new Pen(Color.Black, 2), cx - 8, cy + 4, 16, 8, 20, 140);
+            skin.Dispose();
+        }
+
+        private void DrawPlayerAsKimHead(Graphics g, Rectangle rect)
+        {
+            g.FillEllipse(Brushes.Gold, rect);
+            Rectangle hair = new Rectangle(rect.X, rect.Y, rect.Width, rect.Height / 2);
+            g.FillEllipse(Brushes.Black, hair);
+
+            int cx = rect.X + rect.Width / 2, cy = rect.Y + rect.Height / 2, r = rect.Width / 5;
+            g.FillEllipse(Brushes.Black, cx - r - 8, cy - 3, r * 2, r);
+            g.FillEllipse(Brushes.Black, cx + 8 - r, cy - 3, r * 2, r);
+            g.FillRectangle(Brushes.Black, cx - 4, cy - 1, 8, 2);
+            g.DrawArc(new Pen(Color.Red, 2), cx - 8, cy + 4, 16, 8, 20, 140);
         }
 
         private void DrawGhostAsFlag(Graphics g, Rectangle rect)
