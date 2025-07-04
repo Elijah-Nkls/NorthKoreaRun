@@ -21,6 +21,11 @@ namespace Northkorea_Run
         private int wantedDx, wantedDy;
         private int currentLevel;
         private bool[] levelCompleted = new bool[3];
+
+        // ? Commit 9: Cheat-Code-Felder
+        private bool cheatActive;
+        private DateTime cheatStart;
+
         private List<List<string>> mazes = new List<List<string>>
         {
             new List<string>
@@ -82,6 +87,11 @@ namespace Northkorea_Run
         public Form1()
         {
             InitializeComponent();
+
+            // ? Commit 9: Cheat-Code initialisieren
+            cheatActive = false;
+            cheatStart = DateTime.MinValue;
+
             StartGame();
         }
 
@@ -155,34 +165,55 @@ namespace Northkorea_Run
                 case Keys.Up: wantedDx = 0; wantedDy = -1; break;
                 case Keys.Down: wantedDx = 0; wantedDy = 1; break;
             }
+
+            // ? Commit 9: Cheat aktivieren mit Strg+Alt+L
+            if (e.Control && e.Alt && e.KeyCode == Keys.L && !cheatActive)
+            {
+                cheatActive = true;
+                cheatStart = DateTime.Now;
+                playerSpeed = 11;
+                Invalidate();
+            }
         }
 
         private void GameTimer_Tick(object sender, EventArgs e)
         {
-            // Neue Richtung übernehmen, wenn nicht blockiert
-            var wantPos = new Rectangle(player.X + wantedDx * playerSpeed,
-                                        player.Y + wantedDy * playerSpeed,
-                                        player.Width, player.Height);
+            // ? Commit 9: Cheat deaktivieren nach 10 Sekunden
+            if (cheatActive && (DateTime.Now - cheatStart).TotalSeconds > 10)
+            {
+                cheatActive = false;
+                playerSpeed = 8;
+            }
+
+            // Richtung wechseln, wenn frei
+            var wantPos = new Rectangle(
+                player.X + wantedDx * playerSpeed,
+                player.Y + wantedDy * playerSpeed,
+                player.Width, player.Height
+            );
             if (!walls.Any(w => w.IntersectsWith(wantPos)))
                 (playerDx, playerDy) = (wantedDx, wantedDy);
 
             // Spieler bewegen
-            var nextPos = new Rectangle(player.X + playerDx * playerSpeed,
-                                        player.Y + playerDy * playerSpeed,
-                                        player.Width, player.Height);
+            var nextPos = new Rectangle(
+                player.X + playerDx * playerSpeed,
+                player.Y + playerDy * playerSpeed,
+                player.Width, player.Height
+            );
             if (!walls.Any(w => w.IntersectsWith(nextPos)))
                 player = nextPos;
 
             // Punkte einsammeln
             int keySize = 32, offset = (cellSize - keySize) / 2;
-            points.RemoveAll(p => new Rectangle(p.X + offset, p.Y + offset, keySize, keySize)
-                                      .IntersectsWith(player));
+            points.RemoveAll(p => new Rectangle(
+                p.X + offset, p.Y + offset, keySize, keySize
+            ).IntersectsWith(player));
 
-            // Ausgang öffnen, wenn alle Punkte weg sind
+            // Ausgang öffnen
             if (!doorOpen && points.Count == 0)
                 doorOpen = true;
 
-            // Geister bewegen und Kollision prüfen
+            // Geister bewegen & Kollision
             foreach (var gh in ghosts)
                 gh.MoveTowards(player, walls);
             foreach (var gh in ghosts)
@@ -194,7 +225,7 @@ namespace Northkorea_Run
                     return;
                 }
 
-            // Level abgeschlossen?
+            // Level abschließen
             if (doorOpen && exitDoor.IntersectsWith(player))
             {
                 gameTimer.Stop();
@@ -210,11 +241,11 @@ namespace Northkorea_Run
             var g = e.Graphics;
             g.Clear(Color.Black);
 
-            // Wände zeichnen
+            // Wände
             foreach (var w in walls)
                 g.FillRectangle(Brushes.DarkRed, w);
 
-            // Punkte zeichnen
+            // Punkte
             int keySize = 32, offset = (cellSize - keySize) / 2;
             foreach (var p in points)
             {
@@ -240,6 +271,16 @@ namespace Northkorea_Run
             // Geister als Flaggen
             foreach (var gh in ghosts)
                 DrawGhostAsFlag(g, gh.Rect);
+
+            // ? Commit 9: Cheat-Status einblenden
+            if (cheatActive)
+            {
+                string cheatMsg = "SUPER-SPEED + UNVERWUNDBAR!";
+                Font f = new Font("Arial", 18, FontStyle.Bold);
+                SizeF sz = g.MeasureString(cheatMsg, f);
+                g.DrawString(cheatMsg, f, Brushes.Yellow, (ClientSize.Width - sz.Width) / 2, 8);
+                f.Dispose();
+            }
         }
 
         private void DrawGhostAsFlag(Graphics g, Rectangle rect)
@@ -299,8 +340,7 @@ namespace Northkorea_Run
                     if (!walls.Any(w => w.IntersectsWith(next)))
                     {
                         double dist = Math.Sqrt(
-                            Math.Pow(player.X - next.X, 2) +
-                            Math.Pow(player.Y - next.Y, 2)
+                            Math.Pow(player.X - next.X, 2) + Math.Pow(player.Y - next.Y, 2)
                         );
                         if (dist < bestDist)
                         {
@@ -312,8 +352,7 @@ namespace Northkorea_Run
                 Rect = new Rectangle(
                     Rect.X + bestDir.X * eff,
                     Rect.Y + bestDir.Y * eff,
-                    Rect.Width,
-                    Rect.Height
+                    Rect.Width, Rect.Height
                 );
             }
         }
