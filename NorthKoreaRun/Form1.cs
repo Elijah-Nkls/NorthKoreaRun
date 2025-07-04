@@ -11,6 +11,8 @@ namespace Northkorea_Run
         private System.Windows.Forms.Timer gameTimer;
         private List<Rectangle> walls;
         private List<Point> points;
+        private Rectangle exitDoor;
+        private bool doorOpen;
         private int cellSize = 40, mazeSize = 15;
         private Rectangle player;
         private int playerSpeed = 8;
@@ -82,6 +84,8 @@ namespace Northkorea_Run
                 chosenPoints.Add(rnd.Next(freeForPoints.Count));
             }
             points = chosenPoints.Select(i => new Point(freeForPoints[i].X * cellSize, freeForPoints[i].Y * cellSize)).ToList();
+            exitDoor = new Rectangle(13 * cellSize, 13 * cellSize, cellSize, cellSize);
+            doorOpen = false;
 
             // Initialize game timer
             gameTimer = new System.Windows.Forms.Timer();
@@ -115,51 +119,56 @@ namespace Northkorea_Run
 
         private void GameTimer_Tick(object sender, EventArgs e)
         {
-            // Move player based on current direction
-            Rectangle wantedPosition = player;
-            wantedPosition.X += wantedDx * playerSpeed;
-            wantedPosition.Y += wantedDy * playerSpeed;
-            if (!walls.Any(w => w.IntersectsWith(wantedPosition)))
+            if (!walls.Any(w => w.IntersectsWith(new Rectangle(player.X + wantedDx * playerSpeed, player.Y + wantedDy * playerSpeed, player.Width, player.Height))))
             {
                 playerDx = wantedDx;
                 playerDy = wantedDy;
             }
-            Rectangle nextPosition = player;
-            nextPosition.X += playerDx * playerSpeed;
-            nextPosition.Y += playerDy * playerSpeed;
-            if (!walls.Any(w => w.IntersectsWith(nextPosition)))
+            if (!walls.Any(w => w.IntersectsWith(new Rectangle(player.X + playerDx * playerSpeed, player.Y + playerDy * playerSpeed, player.Width, player.Height))))
             {
-                player = nextPosition;
+                player = new Rectangle(player.X + playerDx * playerSpeed, player.Y + playerDy * playerSpeed, player.Width, player.Height);
             }
             // Remove collected points
             int keySize = 32;
             int offset = (cellSize - keySize) / 2;
             points.RemoveAll(p => new Rectangle(p.X + offset, p.Y + offset, keySize, keySize).IntersectsWith(player));
+            // Open exit door if all points collected
+            if (!doorOpen && points.Count == 0)
+            {
+                doorOpen = true;
+            }
+            // Check if player reached the exit
+            if (doorOpen && exitDoor.IntersectsWith(player))
+            {
+                gameTimer.Stop();
+                MessageBox.Show("Level completed!");
+            }
             this.Invalidate();
         }
 
         private void DrawGameWindow(object sender, PaintEventArgs e)
         {
             Graphics g = e.Graphics;
-            // Clear background
-            g.Clear(Color.Black);
+            if (doorOpen)
+            {
+                g.FillRectangle(Brushes.SaddleBrown, exitDoor);
+                g.DrawRectangle(new Pen(Color.Yellow, 4), exitDoor);
+            }
+            // Draw player as a gold circle
+            g.FillEllipse(Brushes.Gold, player);
             // Draw maze walls
             foreach (Rectangle wall in walls)
             {
                 g.FillRectangle(Brushes.DarkRed, wall);
             }
-
             // Draw collectible points
             int keySize = 32;
             int offset = (cellSize - keySize) / 2;
-            foreach (Point pt in points)
+            foreach (Point point in points)
             {
-                g.FillEllipse(Brushes.Gold, new Rectangle(pt.X + offset, pt.Y + offset, keySize, keySize));
-                g.DrawEllipse(new Pen(Color.Gray, 2), new Rectangle(pt.X + offset, pt.Y + offset, keySize, keySize));
+                g.FillEllipse(Brushes.Gold, new Rectangle(point.X + offset, point.Y + offset, keySize, keySize));
+                g.DrawEllipse(new Pen(Color.Yellow, 2), new Rectangle(point.X + offset, point.Y + offset, keySize, keySize));
             }
-
-            // Draw player as a gold circle
-            g.FillEllipse(Brushes.Gold, player);
         }
     }
 }
