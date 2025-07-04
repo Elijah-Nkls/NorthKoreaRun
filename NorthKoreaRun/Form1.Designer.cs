@@ -1,4 +1,4 @@
-﻿namespace NorthKoreaRun
+﻿namespace Northkorea_Run
 {
     partial class Form1
     {
